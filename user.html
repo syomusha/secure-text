@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{{ user_name }}</title>
+    <style>
+      .message-box {
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+      }
+
+      .sent-message {
+        border-color: #b2dffb;
+        background-color: #e7f4ff;
+      }
+
+      .received-message {
+        border-color: #ffecb3;
+        background-color: #fff8e1;
+      }
+      .my-message {
+        border-color: #98fb98;
+        background-color: #f0fff0;
+        text-align: right;
+        margin-left: auto;
+        color: green;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>{{ user_name }}'s Page</h1>
+
+    <!-- <h2>Add Permission</h2> 
+    <form id="addPermissionForm">
+        <label for="allowedUserSelect">Allow user:</label>
+        <select id="allowedUserSelect">
+        </select> 
+        <button type="submit">Add Permission</button>
+    </form> -->
+
+    <h2>Toggle Permissions</h2>
+    <form id="addPermissionForm"></form>
+    <div id="userPermissions"></div>
+
+    <h2>Send a Message to All Users</h2>
+    <form id="sendMessageForm">
+      <!-- <input type="text" id="senderName" placeholder="Sender Name" value="{{ user_name }}" readonly> -->
+      <textarea
+        id="messageText"
+        placeholder="Type your message here"
+      ></textarea>
+      <button type="submit">Send Message</button>
+    </form>
+
+    <!-- <h2>Sent Messages</h2>
+    <div id="sentMessages"></div> -->
+
+    <h2 id="groupChatTitle">Group Chat with:</h2>
+    <div id="receivedMessages"></div>
+
+    <script>
+      document.getElementById("addPermissionForm").onsubmit = function (e) {
+        e.preventDefault(); // Prevent the form from submitting through the browser
+        addPermission();
+      };
+
+      document.getElementById("sendMessageForm").onsubmit = function (e) {
+        e.preventDefault(); // Prevent the form from submitting through the browser
+        sendMessage();
+      };
+
+      function fetchUsers() {
+        fetch("/get_users")
+          .then((response) => response.json())
+          .then((users) => {
+            const currentUser = "{{ user_name }}";
+            const allowedUserSelect =
+              document.getElementById("allowedUserSelect");
+
+            // Ensure the dropdown is cleared before adding new options
+            allowedUserSelect.innerHTML = "";
+
+            users.forEach((user) => {
+              if (user !== currentUser) {
+                const optionForAllowedUser = document.createElement("option");
+                optionForAllowedUser.value = user;
+                optionForAllowedUser.textContent = user;
+                allowedUserSelect.appendChild(optionForAllowedUser);
+              }
+            });
+          })
+          .catch((error) => console.error("Error fetching users:", error));
+      }
+
+      function fetchAndDisplayPermissions() {
+        // Construct the correct URL with the username parameter
+        const userName = "{{ user_name }}";
+        const url = `/${encodeURIComponent(userName)}/get_permissions`;
+
+        fetch(url, {
+          method: "GET", // Change this to 'GET'
+          headers: { "Content-Type": "application/json" },
+          // No need for a body in a GET request
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            const permissionsListDiv =
+              document.getElementById("permissionsList");
+            permissionsListDiv.innerHTML = ""; // Clear the list
+            data.allowed_users.forEach((allowedUser) => {
+              const userDiv = document.createElement("div");
+              userDiv.textContent = allowedUser;
+              const revokeBtn = document.createElement("button");
+              revokeBtn.textContent = "Revoke Permission";
+              revokeBtn.onclick = function () {
+                removePermission(userName, allowedUser);
+              };
+              userDiv.appendChild(revokeBtn);
+              permissionsListDiv.appendChild(userDiv);
+            });
+          })
+          .catch((error) =>
+            console.error("Error fetching permissions:", error)
+          );
+      }
+
+      function togglePermission(targetUser) {
+        // Determine the current state based on the button color
+        const hasPermission = document
+          .getElementById(targetUser)
+          .classList.contains("has-permission");
+        const endpoint = hasPermission
+          ? "/remove_permission"
+          : "/add_permission";
+        const action = hasPermission ? "Removing" : "Adding";
+
+        fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_name: "{{ user_name }}",
+            // Use the appropriate field based on the action
+            [hasPermission ? "disallowed_user" : "allowed_user"]: targetUser,
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            alert(data.message);
+            // Toggle the button color and class
+            const btn = document.getElementById(targetUser);
+            btn.classList.toggle("has-permission");
+            btn.style.backgroundColor = hasPermission ? "red" : "green";
+          })
+          .catch((error) =>
+            console.error(`${action} permission error:`, error)
+          );
+      }
+
+      function fetchUsersAndPermissions() {
+        fetch("/get_users")
+          .then((response) => response.json())
+          .then((allUsers) => {
+            const currentUser = "{{ user_name }}";
+            fetch(`/${encodeURIComponent(currentUser)}/get_permissions`)
+              .then((response) => response.json())
+              .then((data) => {
+                const permissions = data.allowed_users;
+                const userPermissionsDiv =
+                  document.getElementById("userPermissions");
+                userPermissionsDiv.innerHTML = ""; // Clear the div
+
+                allUsers.forEach((user) => {
+                  if (user !== currentUser) {
+                    const userBtn = document.createElement("button");
+                    userBtn.id = user;
+                    userBtn.textContent = user;
+                    const hasPermission = permissions.includes(user);
+                    userBtn.style.backgroundColor = hasPermission
+                      ? "green"
+                      : "red";
+                    userBtn.classList.add(
+                      hasPermission ? "has-permission" : "no-permission"
+                    );
+                    userBtn.onclick = () => togglePermission(user);
+                    userPermissionsDiv.appendChild(userBtn);
+                  }
+                });
+              })
+              .catch((error) =>
+                console.error("Error fetching permissions:", error)
+              );
+          })
+          .catch((error) => console.error("Error fetching users:", error));
+      }
+
+      function removePermission(userName, disallowedUser) {
+        fetch("/remove_permission", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_name: userName,
+            disallowed_user: disallowedUser,
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            alert(data.message);
+            fetchAndDisplayPermissions(); // Refresh the permissions list
+          })
+          .catch((error) => console.error("Error removing permission:", error));
+      }
+
+      function addPermission() {
+        const allowedUser = document.getElementById("allowedUserSelect").value;
+        fetch("/add_permission", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_name: "{{ user_name }}",
+            allowed_user: allowedUser,
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            alert(data.message);
+          })
+          .catch((error) => console.error("Error adding permission:", error));
+      }
+
+      function sendMessage() {
+        const pathArray = window.location.pathname.split("/"); // Split the path by '/'
+        const sender = pathArray[pathArray.length - 1]; // Assume the username is the last segment
+
+        const message = document.getElementById("messageText").value;
+
+        fetch("/send_message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sender: sender, message: message }),
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Network response was not ok");
+            }
+            return response.json();
+          })
+          .then((data) => {
+            if (data.error) {
+              console.error("Error:", data.error);
+              alert("Error: " + data.error);
+            } else {
+              console.log("Message sent:", data.message);
+              document.getElementById("messageText").value = ""; // Clear the message input field
+              alert("Message sent successfully to all users.");
+            }
+          })
+          .catch((error) => {
+            console.error("Fetch Error:", error);
+            alert("Error: " + error.message);
+          });
+      }
+
+      function fetchSentMessages() {
+        const userName = "{{ user_name }}";
+        fetch(`/${userName}/sent_messages`)
+          .then((response) => response.json())
+          .then((data) => {
+            const sentMessagesDiv = document.getElementById("sentMessages");
+            sentMessagesDiv.innerHTML = ""; // Clear previous messages
+            data.forEach((msg) => {
+              const msgDiv = document.createElement("div");
+              msgDiv.classList.add("message-box", "sent-message"); // Add classes for styling
+              msgDiv.textContent = `To ${msg.to}: ${msg.message}`;
+              sentMessagesDiv.appendChild(msgDiv);
+            });
+          })
+          .catch((error) =>
+            console.error("Error fetching sent messages:", error)
+          );
+      }
+      function fetchReceivedMessages() {
+        const userName = "{{ user_name }}";
+        fetch(`/${userName}/received_messages`)
+          .then((response) => response.json())
+          .then((data) => {
+            const receivedMessagesDiv =
+              document.getElementById("receivedMessages");
+            receivedMessagesDiv.innerHTML = ""; // Clear previous messages
+            data.forEach((msg) => {
+              const msgDiv = document.createElement("div");
+              msgDiv.classList.add("message-box"); // Add base styling
+              if (msg.from === userName) {
+                msgDiv.classList.add("my-message"); // Add specific class for user's messages
+                msgDiv.textContent = `Me: ${msg.message}`;
+              } else {
+                msgDiv.classList.add("received-message"); // Different styling for received messages
+                msgDiv.textContent = `${msg.from}: ${msg.message}`;
+              }
+              receivedMessagesDiv.appendChild(msgDiv);
+            });
+          })
+          .catch((error) =>
+            console.error("Error fetching received messages:", error)
+          );
+      }
+
+      function updateGroupChatTitle() {
+        fetch("/get_users") // Assuming this endpoint returns all users
+          .then((response) => response.json())
+          .then((users) => {
+            const currentUser = "{{ user_name }}";
+            const otherUsers = users.filter((user) => user !== currentUser);
+            document.getElementById(
+              "groupChatTitle"
+            ).textContent = `Group Chat with: ${otherUsers.join(", ")}`;
+          })
+          .catch((error) => console.error("Error fetching users:", error));
+      }
+
+      window.onload = function () {
+        fetchUsers();
+        fetchAndDisplayPermissions();
+        fetchUsersAndPermissions();
+        fetchReceivedMessages();
+        // fetchSentMessages();
+        updateGroupChatTitle();
+      };
+    </script>
+  </body>
+</html>
