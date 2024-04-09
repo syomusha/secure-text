@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Secure Social Media App</title>
+    <style>
+      .user-block {
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin: 5px 0;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+
+      .user-block:hover {
+        background-color: #f0f0f0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Select a User</h1>
+    <div>
+      <input type="text" id="newUserName" placeholder="Enter new user name" />
+      <button onclick="createUser()">Create User</button>
+    </div>
+    <div id="userList"></div>
+
+    <script>
+      function fetchUsers() {
+        fetch("/get_users")
+          .then((response) => response.json())
+          .then((data) => {
+            const userList = document.getElementById("userList");
+            userList.innerHTML = ""; // Clear previous list
+            data.forEach((user) => {
+              const userBlock = document.createElement("div");
+              userBlock.className = "user-block";
+              userBlock.innerHTML = user;
+              userBlock.onclick = function () {
+                selectUser(user);
+              };
+              userList.appendChild(userBlock);
+            });
+          })
+          .catch((error) => console.error("Error fetching users:", error));
+      }
+
+      function selectUser(user) {
+        // Here you can define how to "click into" each user.
+        // For demonstration, we'll simply alert the user name,
+        // but you could instead render a user-specific page or a modal with options.
+        alert("Selected User: " + user);
+      }
+
+      function createUser() {
+        const userName = document.getElementById("newUserName").value;
+        if (userName) {
+          fetch("/generate_keys", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ user_name: userName }),
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              alert(data.message);
+              fetchUsers(); // Refresh the list
+            })
+            .catch((error) => console.error("Error creating user:", error));
+        } else {
+          alert("User name is required");
+        }
+      }
+
+      window.onload = function () {
+        fetchUsers();
+      };
+
+      function selectUser(user) {
+        window.location.href = `/${user}`;
+      }
+    </script>
+  </body>
+</html>
